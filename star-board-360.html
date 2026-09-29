@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Star board</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--led:hsl(185 100% 55%);--b:.7;--on:0;--core:#fff}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+body{margin:0;min-height:100%;background:radial-gradient(circle at 50% 45%,#22262a 0,#0d0f11 65%,#050607 100%);color:#fff;font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+.stage{position:relative;min-height:100dvh;display:grid;place-items:center;padding:16px}
+.glow{position:absolute;left:50%;top:50%;width:min(170vw,1100px);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;background:radial-gradient(circle,var(--led) 0,transparent 62%);mix-blend-mode:screen;opacity:calc(var(--on) * var(--b) * .5);transition:opacity .5s}
+.stage{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.stage.grabbing{cursor:grabbing}
+.scene{position:relative;perspective:1500px;width:min(92vw,86vh,680px);aspect-ratio:1}
+.rig{position:absolute;inset:0;transform-style:preserve-3d;transform:rotateX(16deg) rotateY(-28deg)}
+.face,.slab{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
+.front{transform:translateZ(5.5px);backface-visibility:hidden}
+.back{transform:rotateY(180deg) translateZ(5.5px);backface-visibility:hidden}
+.shadow{position:absolute;left:12%;right:12%;bottom:-9%;height:9%;background:radial-gradient(ellipse,rgba(0,0,0,.65),transparent 70%);filter:blur(8px);pointer-events:none}
+.hint{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);font-size:.85rem;color:rgba(255,255,255,.7);pointer-events:none;transition:opacity .6s}
+.dock{text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.acts{display:flex;gap:10px;margin-top:16px}
+.pill{flex:1;padding:9px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.14);color:#fff;font:inherit;font-size:.88rem;cursor:pointer;text-shadow:inherit}
+.pill[aria-pressed="true"]{background:var(--led);color:#001;text-shadow:none;box-shadow:0 0 14px var(--led)}
+.pill:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.lit{opacity:calc(var(--on) * (.3 + .7 * var(--b)));transition:opacity .35s}
+.halo{opacity:calc(var(--on) * var(--b));transform-box:fill-box;transform-origin:center;transform:scale(calc(.55 + .75 * var(--b)));transition:opacity .35s,transform .35s}
+#spill{opacity:calc(var(--on) * var(--b) * .55);transition:opacity .4s}
+
+.dock{position:fixed;left:0;top:0;width:min(320px,calc(100vw - 24px));padding:8px 20px 20px;border-radius:28px;
+background:repeating-linear-gradient(90deg,rgba(255,255,255,.36) 0,rgba(255,255,255,.13) 2px,rgba(255,255,255,.03) 7px,rgba(0,0,0,.18) 12px,rgba(255,255,255,.1) 13px,rgba(255,255,255,.24) 14px),linear-gradient(140deg,rgba(255,255,255,.2),rgba(255,255,255,.03)),color-mix(in srgb,var(--led) 14%,transparent);
+-webkit-backdrop-filter:blur(7px) saturate(1.5);backdrop-filter:blur(7px) saturate(1.5);
+border:1px solid rgba(255,255,255,.3);box-shadow:0 24px 60px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(255,255,255,.08);
+transition:box-shadow .2s,transform .2s;visibility:hidden}
+.dock.drag{transform:scale(1.02);box-shadow:0 34px 80px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.5)}
+.grip{height:26px;display:grid;place-items:center;cursor:grab;touch-action:none;border-radius:14px}
+.dock.drag .grip{cursor:grabbing}
+.grip::before{content:"";width:44px;height:5px;border-radius:3px;background:rgba(255,255,255,.55)}
+.grip:focus-visible,.switch:focus-visible,.sw button:focus-visible,input:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.pwr{display:flex;align-items:center;justify-content:space-between;margin:4px 0 16px}
+.pwr span{font-weight:600;font-size:1.05rem}
+.switch{width:62px;height:34px;border-radius:17px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.16);position:relative;cursor:pointer;padding:0;transition:background .25s,box-shadow .25s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .25s}
+.switch[aria-checked="true"]{background:var(--led);box-shadow:0 0 18px var(--led)}
+.switch[aria-checked="true"]::after{transform:translateX(28px)}
+.row{display:grid;gap:8px;margin-top:14px}
+.row>label,.row>.lab{display:flex;justify-content:space-between;font-size:.88rem;color:rgba(255,255,255,.78)}
+.row output{color:#fff;font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:10px;border-radius:5px;background:rgba(255,255,255,.22);margin:6px 0;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:4px solid var(--led);box-shadow:0 2px 8px rgba(0,0,0,.4);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:4px solid var(--led);cursor:pointer}
+#hue{background:linear-gradient(90deg,hsl(0 100% 55%),hsl(60 100% 55%),hsl(120 100% 55%),hsl(180 100% 55%),hsl(240 100% 55%),hsl(300 100% 55%),hsl(360 100% 55%))}
+#bri{background:linear-gradient(90deg,rgba(255,255,255,.18),var(--led))}
+.sw{display:flex;flex-wrap:wrap;gap:10px}
+.sw button{width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,.25);cursor:pointer;padding:0;box-shadow:inset 0 1px 2px rgba(255,255,255,.5)}
+.sw button[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="glow"></div>
+<div class="scene"><div class="rig" id="rig">
+<svg id="board" class="face front" viewBox="0 0 400 400" role="img" aria-label="Star-shaped circuit board with eleven LEDs">
+  <defs>
+    <linearGradient id="mk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#17774f"/><stop offset=".5" stop-color="#0e5a3b"/><stop offset="1" stop-color="#093f2a"/></linearGradient>
+    <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6f7"/><stop offset=".5" stop-color="#a9b0b5"/><stop offset="1" stop-color="#e6e9eb"/></linearGradient>
+    <linearGradient id="cb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f4ea"/><stop offset="1" stop-color="#cbc5b1"/></linearGradient>
+    <linearGradient id="sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient>
+    <radialGradient id="ph"><stop offset="0" stop-color="#f0dc82"/><stop offset=".7" stop-color="#cdb45a"/><stop offset="1" stop-color="#8a7a38"/></radialGradient>
+    <radialGradient id="g"><stop offset="0" style="stop-color:var(--led)" stop-opacity=".95"/><stop offset=".4" style="stop-color:var(--led)" stop-opacity=".38"/><stop offset="1" style="stop-color:var(--led)" stop-opacity="0"/></radialGradient>
+    <radialGradient id="sp"><stop offset="0" style="stop-color:var(--led)" stop-opacity=".85"/><stop offset="1" style="stop-color:var(--led)" stop-opacity="0"/></radialGradient>
+    <filter id="nz" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0"/></filter>
+    <clipPath id="clip"><polygon id="clipPoly"/></clipPath>
+  </defs>
+  <g id="art"></g>
+</svg>
+</div><div class="shadow"></div></div>
+<div class="hint" id="hint">Drag the board to rotate</div>
+</div>
+
+<div class="dock" id="dock" role="group" aria-label="LED controls">
+  <div class="grip" id="grip" tabindex="0" role="button" aria-label="Move controls (drag or use arrow keys)"></div>
+  <div class="pwr"><span id="status">Off</span><button class="switch" id="sw" role="switch" aria-checked="false" aria-label="Power"></button></div>
+  <div class="row"><label for="bri">Brightness <output id="briOut">70%</output></label><input type="range" id="bri" min="5" max="100" value="70"></div>
+  <div class="row"><span class="lab">Colour</span><div class="sw" id="swatches" role="group" aria-label="Colour presets"></div><input type="range" id="hue" min="0" max="360" value="185" aria-label="Hue"></div>
+  <div class="acts"><button class="pill" id="spin" aria-pressed="false">Auto-rotate</button><button class="pill" id="reset">Reset view</button></div>
+</div>
+
+<script>
+const cx=200,cy=210,R=178,r=72,k=.78;
+const P=(rad,i)=>{const a=(-90+i*36)*Math.PI/180;return[cx+rad*Math.cos(a),cy+rad*Math.sin(a)]};
+const f=n=>n.toFixed(1);
+const star=q=>Array.from({length:10},(_,i)=>P((i%2?r:R)*q,i).map(f).join(',')).join(' ');
+const ring=star(k);
+document.getElementById('clipPoly').setAttribute('points',star(1));
+
+const leds=[];
+for(let i=0;i<10;i++){const [x,y]=P((i%2?r:R)*k,i);leds.push({x,y,z:i%2?.85:1,a:Math.atan2(y-cy,x-cx)*180/Math.PI,rad:(i%2?r:R)*k,i})}
+leds.push({x:cx,y:cy,z:1.3,a:0,rad:0,i:-1});
+const spokes=[0,2,4,6,8].map(i=>P(R*k,i));
+
+let s='';
+// board body: edge, thickness, soldermask, texture
+s+=`<polygon points="${star(1)}" fill="#c8b26a" stroke="#c8b26a" stroke-width="2" stroke-linejoin="round"/>`;
+s+=`<polygon points="${star(.985)}" fill="url(#mk)" stroke="url(#mk)" stroke-width="3" stroke-linejoin="round"/>`;
+s+=`<g clip-path="url(#clip)"><rect width="400" height="400" filter="url(#nz)" opacity=".5"/><rect width="400" height="400" fill="url(#sh)"/></g>`;
+// copper under mask: three-layer trace for a raised look
+const T=a=>`<polygon points="${ring}" ${a}/>`+spokes.map(([x,y])=>`<line x1="${cx}" y1="${cy}" x2="${f(x)}" y2="${f(y)}" ${a}/>`).join('');
+s+=`<g fill="none" stroke-linejoin="round" stroke-linecap="round">${T('stroke="#04261a" stroke-width="7.5" stroke-opacity=".7"')}${T('stroke="#2c8f64" stroke-width="5"')}${T('stroke="#6fd3a2" stroke-opacity=".5" stroke-width="1.3" transform="translate(-.6 -.9)"')}</g>`;
+s+=`<polygon points="${star(.93)}" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="1" stroke-dasharray="5 4" stroke-linejoin="round"/>`;
+// resistors (0603) on spokes
+const mono='font-family="ui-monospace,Menlo,monospace"';
+spokes.forEach(([x,y],n)=>{
+  const [rx,ry]=P(R*k*.5,n*2),deg=-90+n*72;
+  s+=`<g transform="translate(${f(rx)} ${f(ry)}) rotate(${deg})"><rect x="-9" y="-5" width="18" height="10" rx="1" fill="url(#ag)"/><rect x="-5" y="-4.5" width="10" height="9" fill="#14171a"/><rect x="-5" y="-4.5" width="10" height="2" fill="#fff" fill-opacity=".12"/></g>`;
+  const [tx,ty]=P(R*k*.5+15,n*2);
+  s+=`<text x="${f(tx)}" y="${f(ty)}" font-size="6.5" fill="#fff" fill-opacity=".75" text-anchor="middle" dominant-baseline="middle" ${mono}>R${n+1}</text>`;
+});
+// controller chip (SOP-8)
+let pins='';for(let j=0;j<4;j++){const px=-7.5+j*5;pins+=`<rect x="${px-1.1}" y="-9" width="2.2" height="3.5" fill="url(#ag)"/><rect x="${px-1.1}" y="5.5" width="2.2" height="3.5" fill="url(#ag)"/>`}
+s+=`<g transform="translate(${cx} ${cy+29})">${pins}<rect x="-11" y="-6" width="22" height="12" rx="1.2" fill="#181b1e"/><rect x="-11" y="-6" width="22" height="3" rx="1" fill="#fff" fill-opacity=".1"/><circle cx="-8" cy="3" r="1.1" fill="#fff" fill-opacity=".35"/></g>`;
+s+=`<text x="${cx+18}" y="${cy+30}" font-size="6.5" fill="#fff" fill-opacity=".75" dominant-baseline="middle" ${mono}>U1</text>`;
+// LED designators + vias
+leds.forEach(l=>{
+  if(l.i<0){s+=`<text x="${cx-16}" y="${cy-20}" font-size="6.5" fill="#fff" fill-opacity=".75" text-anchor="end" ${mono}>D11</text>`;return}
+  const [tx,ty]=P(l.rad-19,l.i);
+  s+=`<text x="${f(tx)}" y="${f(ty)}" font-size="6.5" fill="#fff" fill-opacity=".75" text-anchor="middle" dominant-baseline="middle" ${mono}>D${l.i+1}</text>`;
+});
+s+=`<text x="${cx}" y="${cy-146}" font-size="6.5" fill="#fff" fill-opacity=".6" text-anchor="middle" ${mono}>STAR-11 REV B</text>`;
+// light spill on the board
+s+=`<g clip-path="url(#clip)"><circle id="spill" cx="${cx}" cy="${cy}" r="215" fill="url(#sp)" style="mix-blend-mode:screen"/></g>`;
+// SMD LEDs
+leds.forEach(l=>{
+  s+=`<g transform="translate(${f(l.x)} ${f(l.y)}) rotate(${f(l.a)}) scale(${l.z})" data-i="${l.i+1}">
+    <rect x="-14" y="-8.5" width="7" height="17" rx="1.2" fill="url(#ag)"/><rect x="7" y="-8.5" width="7" height="17" rx="1.2" fill="url(#ag)"/>
+    <rect x="-11.5" y="-11.5" width="23" height="23" rx="2.6" fill="url(#cb)" stroke="#8d8875" stroke-width=".8"/>
+    <circle r="8.6" fill="#7b7457"/><circle r="7.6" fill="url(#ph)"/>
+    <g class="lit"><circle r="7.6" style="fill:var(--led)"/><circle r="4.2" style="fill:var(--core)"/></g>
+    <ellipse cx="-2.6" cy="-3" rx="3" ry="1.7" fill="#fff" fill-opacity=".38" transform="rotate(-30 -2.6 -3)"/>
+  </g>`;
+});
+// halos on top so glow spills over the package edges
+leds.forEach(l=>{s+=`<g transform="translate(${f(l.x)} ${f(l.y)}) scale(${l.z})" data-h="${l.i+1}" style="pointer-events:none"><circle class="halo" r="46" fill="url(#g)" style="mix-blend-mode:screen"/></g>`});
+document.getElementById('art').innerHTML=s;
+
+// state
+const svg=document.getElementById('board'),root=document.documentElement;
+const st={on:false,h:185,sat:100,b:.7};
+const sw=document.getElementById('sw'),bri=document.getElementById('bri'),hue=document.getElementById('hue'),box=document.getElementById('swatches');
+[['Warm white',38,30],['Red',0,100],['Amber',32,100],['Green',130,100],['Cyan',185,100],['Blue',220,100],['Violet',275,100],['Pink',320,100]].forEach(([n,h,sa])=>{
+  const b=document.createElement('button');b.type='button';b.title=n;b.setAttribute('aria-label',n);
+  b.style.background=`hsl(${h} ${sa}% 55%)`;b.dataset.h=h;b.dataset.s=sa;
+  b.onclick=()=>{st.h=h;st.sat=sa;hue.value=h;render()};box.appendChild(b);
+});
+function render(){
+  const v=root.style;
+  v.setProperty('--led',`hsl(${st.h} ${st.sat}% 55%)`);
+  v.setProperty('--core',`hsl(${st.h} ${Math.round(st.sat*.45)}% ${Math.round(74+st.b*20)}%)`);
+  v.setProperty('--b',st.b);v.setProperty('--on',st.on?1:0);
+  sw.setAttribute('aria-checked',st.on);
+  document.getElementById('status').textContent=st.on?'On':'Off';
+  document.getElementById('briOut').textContent=Math.round(st.b*100)+'%';
+  box.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.h===st.h&&+b.dataset.s===st.sat));
+}
+sw.onclick=()=>{
+  st.on=!st.on;
+  svg.querySelectorAll('[data-i]').forEach(g=>{
+    const d=st.on?g.dataset.i*70:0;
+    g.querySelector('.lit').style.transitionDelay=d+'ms';
+    svg.querySelector(`[data-h="${g.dataset.i}"] .halo`).style.transitionDelay=d+'ms';
+  });
+  render();
+  setTimeout(()=>svg.querySelectorAll('.lit,.halo').forEach(e=>e.style.transitionDelay='0ms'),1100);
+};
+bri.oninput=()=>{st.b=bri.value/100;render()};
+hue.oninput=()=>{st.h=+hue.value;st.sat=100;render()};
+render();
+
+// floating, draggable glass panel
+const dock=document.getElementById('dock'),grip=document.getElementById('grip');
+const probe=document.createElement('div');probe.style.cssText='position:fixed;top:0;left:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px)';document.body.appendChild(probe);
+let drag=null,pos={x:0,y:0};
+function place(x,y){
+  const w=dock.offsetWidth,h=dock.offsetHeight,top=probe.offsetHeight+8;
+  pos.x=Math.max(8,Math.min(innerWidth-w-8,x));pos.y=Math.max(top,Math.min(innerHeight-h-8,y));
+  dock.style.left=pos.x+'px';dock.style.top=pos.y+'px';
+}
+grip.addEventListener('pointerdown',e=>{const b=dock.getBoundingClientRect();drag={dx:e.clientX-b.left,dy:e.clientY-b.top};grip.setPointerCapture(e.pointerId);dock.classList.add('drag')});
+grip.addEventListener('pointermove',e=>{if(drag)place(e.clientX-drag.dx,e.clientY-drag.dy)});
+['pointerup','pointercancel'].forEach(t=>grip.addEventListener(t,()=>{drag=null;dock.classList.remove('drag')}));
+grip.addEventListener('keydown',e=>{const m={ArrowLeft:[-24,0],ArrowRight:[24,0],ArrowUp:[0,-24],ArrowDown:[0,24]}[e.key];if(m){e.preventDefault();place(pos.x+m[0],pos.y+m[1])}});
+addEventListener('resize',()=>place(pos.x,pos.y));
+place((innerWidth-dock.offsetWidth)/2,innerHeight-dock.offsetHeight-24);
+dock.style.visibility='visible';
+
+// board thickness: stacked slabs give the edge real depth when rotated
+const rig=document.getElementById('rig'),front=document.getElementById('board');
+let sl='';
+for(let z=-4.5;z<=4.5;z++){const c=Math.abs(z)>3?'#0a3f2b':'#bda765';sl+=`<svg class="slab" viewBox="0 0 400 400" style="transform:translateZ(${z}px)"><polygon points="${star(1)}" fill="${c}" stroke="${c}" stroke-width="2" stroke-linejoin="round"/></svg>`}
+rig.insertAdjacentHTML('afterbegin',sl);
+
+// back of the board: pentagram traces, silver vias, silkscreen
+const pg=a=>spokes.map(([x1,y1],j)=>{const [x2,y2]=spokes[(j+2)%5];return `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" ${a}/>`}).join('')+`<polygon points="${ring}" ${a}/>`;
+let bk=`<polygon points="${star(1)}" fill="#c8b26a" stroke="#c8b26a" stroke-width="2" stroke-linejoin="round"/><polygon points="${star(.985)}" fill="url(#mk)" stroke="url(#mk)" stroke-width="3" stroke-linejoin="round"/><g clip-path="url(#clip)"><rect width="400" height="400" filter="url(#nz)" opacity=".5"/><rect width="400" height="400" fill="url(#sh)"/></g>`;
+bk+=`<g fill="none" stroke-linejoin="round" stroke-linecap="round">${pg('stroke="#04261a" stroke-width="7.5" stroke-opacity=".7"')}${pg('stroke="#2c8f64" stroke-width="5"')}${pg('stroke="#6fd3a2" stroke-opacity=".5" stroke-width="1.3" transform="translate(-.6 -.9)"')}</g>`;
+bk+=`<polygon points="${star(.93)}" fill="none" stroke="#fff" stroke-opacity=".3" stroke-dasharray="5 4" stroke-linejoin="round"/>`;
+leds.forEach(l=>{bk+=`<circle cx="${f(l.x)}" cy="${f(l.y)}" r="7" fill="url(#ag)"/><circle cx="${f(l.x)}" cy="${f(l.y)}" r="2.4" fill="#06120c"/>`});
+bk+=`<polygon points="${star(.11)}" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="1.2" stroke-linejoin="round" transform="translate(0 -6)"/>`;
+bk+=`<text x="${cx}" y="${cy+30}" font-size="9" fill="#fff" fill-opacity=".85" text-anchor="middle" ${mono}>STAR-23</text><text x="${cx}" y="${cy+41}" font-size="6.5" fill="#fff" fill-opacity=".7" text-anchor="middle" ${mono}>REV B 5V DC</text>`;
+rig.insertAdjacentHTML('beforeend',`<svg id="rear" class="face back" viewBox="0 0 400 400" aria-hidden="true">${bk}</svg>`);
+const rear=document.getElementById('rear');
+
+// 360 rotation: drag, momentum, arrow keys, auto-rotate, reset
+const stage=document.querySelector('.stage'),spin=document.getElementById('spin'),rst=document.getElementById('reset'),hint=document.getElementById('hint');
+let rx=16,ry=-28,vx=0,vy=0,auto=false,down=null,run=false,target=null;
+function apply(){
+  rig.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`;
+  const n=Math.cos(rx*Math.PI/180)*Math.cos(ry*Math.PI/180);
+  front.style.filter=`brightness(${(.72+.28*Math.max(0,n)).toFixed(2)})`;
+  rear.style.filter=`brightness(${(.72+.28*Math.max(0,-n)).toFixed(2)})`;
+}
+function tick(){
+  if(!down){
+    if(target){rx+=(target[0]-rx)*.12;ry+=(target[1]-ry)*.12;if(Math.abs(target[0]-rx)<.1&&Math.abs(target[1]-ry)<.1){rx=target[0];ry=target[1];target=null}}
+    else{if(auto)ry+=.4;ry+=vy;rx+=vx;vx*=.93;vy*=.93;if(Math.abs(vx)<.01)vx=0;if(Math.abs(vy)<.01)vy=0}
+  }
+  apply();
+  if(down||auto||vx||vy||target)requestAnimationFrame(tick);else run=false;
+}
+function kick(){if(!run){run=true;requestAnimationFrame(tick)}}
+stage.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};vx=vy=0;target=null;stage.setPointerCapture(e.pointerId);stage.classList.add('grabbing');hint.style.opacity=0;kick()});
+stage.addEventListener('pointermove',e=>{if(!down)return;const dx=e.clientX-down.x,dy=e.clientY-down.y;down={x:e.clientX,y:e.clientY};ry+=dx*.45;rx-=dy*.45;vy=dx*.45;vx=-dy*.45});
+['pointerup','pointercancel'].forEach(t=>stage.addEventListener(t,()=>{down=null;stage.classList.remove('grabbing');kick()}));
+stage.tabIndex=0;stage.setAttribute('aria-label','Drag to rotate the board. Arrow keys also rotate it.');
+stage.addEventListener('keydown',e=>{const m={ArrowLeft:[0,-10],ArrowRight:[0,10],ArrowUp:[10,0],ArrowDown:[-10,0]}[e.key];if(m){e.preventDefault();rx+=m[0];ry+=m[1];kick()}});
+spin.onclick=()=>{auto=!auto;spin.setAttribute('aria-pressed',auto);target=null;kick()};
+rst.onclick=()=>{auto=false;spin.setAttribute('aria-pressed',false);vx=vy=0;rx-=360*Math.round((rx-16)/360);ry-=360*Math.round((ry+28)/360);target=[16,-28];kick()};
+stage.addEventListener('dblclick',()=>rst.click());
+apply();
+</script>
+</body>
+</html>
